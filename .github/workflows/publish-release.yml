@@ -1,28 +1,36 @@
 name: Publish Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
+    types: [main]
 
 jobs:
   publish-release:
     permissions:
       contents: write
-    if: |
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.head.ref, 'release/')
+    # release merge commits come from GitHub user
+    if: github.event.head_commit.committer.name == 'GitHub'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.sha }}
+          # we need this commit + the last so we can compare below
+          fetch-depth: 2
+      # exit early if the version has not changed
+      - run: |
+          VERSION_BEFORE="$(git show ${{ github.event.before }}:package.json | jq --raw-output .version)"
+          VERSION_AFTER="$(jq --raw-output .version package.json)"
+          if [[ "$VERSION_BEFORE" == "$VERSION_AFTER" ]]; then
+            exit 0
+          fi
       - name: Get Node.js version
         id: nvm
         run: echo ::set-output name=NODE_VERSION::$(cat .nvmrc)
       - uses: actions/setup-node@v2
         with:
           node-version: ${{ steps.nvm.outputs.NODE_VERSION }}
-      - uses: MetaMask/action-publish-release@v1
+      - uses: MetaMask/action-publish-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: |
@@ -31,7 +39,10 @@ jobs:
       - uses: actions/cache@v3
         id: restore-build
         with:
-          path: ./dist
+          path: |
+            ./dist
+            ./yarn.lock
+            ./node_modules
           key: ${{ github.sha }}
 
   publish-npm-dry-run:
@@ -44,13 +55,18 @@ jobs:
       - uses: actions/cache@v3
         id: restore-build
         with:
-          path: ./dist
+          path: |
+            ./dist
+            ./yarn.lock
+            ./node_modules
           key: ${{ github.sha }}
         # Set `ignore-scripts` to skip `prepublishOnly` because the release was built already in the previous job
       - run: npm config set ignore-scripts true
       - name: Dry Run Publish
         # omit npm-token token to perform dry run publish
         uses: MetaMask/action-npm-publish@v1.1.0
+        env:
+          SKIP_PREPACK: true
 
   publish-npm:
     environment: npm-publish
@@ -63,7 +79,10 @@ jobs:
       - uses: actions/cache@v3
         id: restore-build
         with:
-          path: ./dist
+          path: |
+            ./dist
+            ./yarn.lock
+            ./node_modules
           key: ${{ github.sha }}
         # Set `ignore-scripts` to skip `prepublishOnly` because the release was built already in the previous job
       - run: npm config set ignore-scripts true
@@ -71,3 +90,5 @@ jobs:
         uses: MetaMask/action-npm-publish@v1.1.0
         with:
           npm-token: ${{ secrets.NPM_TOKEN }}
+        env:
+          SKIP_PREPACK: true
