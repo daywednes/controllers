@@ -41,7 +41,6 @@ jobs:
         with:
           path: |
             ./dist
-            ./yarn.lock
             ./node_modules
           key: ${{ github.sha }}
 
@@ -57,7 +56,6 @@ jobs:
         with:
           path: |
             ./dist
-            ./yarn.lock
             ./node_modules
           key: ${{ github.sha }}
         # Set `ignore-scripts` to skip `prepublishOnly` because the release was built already in the previous job
@@ -81,7 +79,6 @@ jobs:
         with:
           path: |
             ./dist
-            ./yarn.lock
             ./node_modules
           key: ${{ github.sha }}
         # Set `ignore-scripts` to skip `prepublishOnly` because the release was built already in the previous job
